@@ -54,7 +54,46 @@ export interface RegionFetchX402ProviderOptions {
   networks?: string[];
 }
 
-const PRIVATE_KEY_RE = /^0x[0-9a-fA-F]{64}$/;
+const HEX_64_RE = /^[0-9a-fA-F]{64}$/;
+
+/**
+ * Accept the forms a private key realistically arrives in.
+ *
+ * Wallet exports frequently omit the `0x` prefix, and a key pasted into a shell
+ * or an MCP `env` block often carries a trailing newline or surrounding quotes.
+ * Rejecting those is a papercut on the one input a caller cannot debug by
+ * printing it, so normalize first and only then validate.
+ *
+ * Returns the canonical `0x`-prefixed form, or a reason it could not.
+ */
+export function normalizePrivateKey(
+  input: string,
+): { key: `0x${string}` } | { error: string } {
+  const trimmed = input.trim().replace(/^["']|["']$/g, "").trim();
+  if (trimmed === "") return { error: "privateKey is empty." };
+
+  const body = trimmed.replace(/^0[xX]/, "");
+
+  if (!HEX_64_RE.test(body)) {
+    // Say what is wrong without ever echoing the value.
+    const nonHex = body.replace(/[0-9a-fA-F]/g, "").length;
+    if (nonHex > 0) {
+      return {
+        error:
+          `privateKey contains ${nonHex} non-hexadecimal character(s). ` +
+          "Expected 64 hex characters, optionally prefixed with 0x. " +
+          "(Value withheld.)",
+      };
+    }
+    return {
+      error:
+        `privateKey has ${body.length} hex characters; a 32-byte key needs 64. ` +
+        "(Value withheld.)",
+    };
+  }
+
+  return { key: `0x${body.toLowerCase()}` };
+}
 
 /**
  * Build a payment provider that signs one fresh x402 authorization per request.
@@ -119,13 +158,9 @@ async function resolveSigner(
       "createX402PaymentProvider requires either a signer or a privateKey.",
     );
   }
-  // Validated by shape only — the value itself is never echoed into an error.
-  if (!PRIVATE_KEY_RE.test(privateKey)) {
-    throw new RegionFetchConfigError(
-      "privateKey must be a 0x-prefixed 32-byte hex string. (Value withheld from this message.)",
-    );
-  }
+  const normalized = normalizePrivateKey(privateKey);
+  if ("error" in normalized) throw new RegionFetchConfigError(normalized.error);
 
   const { privateKeyToAccount } = await import("viem/accounts");
-  return privateKeyToAccount(privateKey as `0x${string}`) as unknown as RegionFetchEvmSigner;
+  return privateKeyToAccount(normalized.key) as unknown as RegionFetchEvmSigner;
 }
