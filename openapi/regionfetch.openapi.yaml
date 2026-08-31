@@ -1,0 +1,384 @@
+# Region Fetch public HTTP contract.
+#
+# This is a CLIENT-SIDE snapshot, derived from the implementation handoff and
+# verified against https://regionfetch.dev on 2026-08-30. The deployment does
+# not yet publish an authoritative OpenAPI document at a stable URL — requests
+# for /openapi.yaml return the marketing SPA's HTML with HTTP 200. Until that
+# is fixed, treat this file as the SDK's view of the contract, not the server's.
+#
+# Verified divergences from the handoff text are marked "VERIFIED".
+openapi: 3.1.0
+
+info:
+  title: Region Fetch
+  version: "1.0.0"
+  summary: Paid geo-targeted web retrieval with signed Ed25519 receipts.
+  description: |
+    One request selects a country and a retrieval mode, settles one x402 exact
+    EVM payment, fetches one public HTTPS URL through a regional supplier, and
+    returns the body plus a signed receipt describing what actually happened.
+
+    Payment is the credential: there are no accounts, API keys, or sessions.
+  license:
+    name: MIT
+
+servers:
+  - url: https://regionfetch.dev
+    description: Production
+
+tags:
+  - name: fetch
+  - name: attestation
+  - name: service
+
+paths:
+  /api/healthz:
+    get:
+      tags: [service]
+      operationId: getHealth
+      summary: Liveness check
+      description: |
+        Proves the API process is responding. It does NOT prove that payment
+        credentials, the database, supplier credentials, or receipt signing are
+        configured.
+      responses:
+        "200":
+          description: The service is responding.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, examples: ["ok"] }
+
+  /api/attestation-key:
+    get:
+      tags: [attestation]
+      operationId: getAttestationKey
+      summary: The active receipt verification key
+      description: |
+        Retrieve independently to prove a receipt came from this deployment
+        rather than merely being self-consistent. Keys rotate; cache with
+        revalidation, never permanently.
+      responses:
+        "200":
+          description: The active public key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttestationKey" }
+        "503":
+          description: Attestation signing is unavailable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/fetch:
+    post:
+      tags: [fetch]
+      operationId: createFetch
+      summary: Execute or replay one paid regional fetch
+      description: |
+        VERIFIED: the payment gate runs BEFORE body validation. A request with an
+        invalid `country` still answers 402, not 400. Validate input client-side
+        so an authorization is not created for a request the server will reject.
+
+        Submitting the same payment again after terminal completion returns the
+        stored result and original receipt with `replayed: true`; no second
+        retrieval occurs.
+      parameters:
+        - name: PAYMENT-SIGNATURE
+          in: header
+          required: true
+          description: |
+            An x402 exact EVM authorization. Canonical. `X-Payment` is accepted
+            for legacy compatibility but should not be used by new clients.
+
+            This is a bearer credential. Never log it, persist it, or reuse it
+            for a different request body.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FetchRequest" }
+      responses:
+        "200":
+          description: Terminal success, or a replay of one.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FetchSuccess" }
+        "400":
+          description: Invalid body, country, mode, URL, or an unsupported target.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "402":
+          description: |
+            Payment required.
+
+            VERIFIED: the response body is an empty JSON object `{}` — it does
+            NOT carry an `error` envelope. The challenge is in the
+            `PAYMENT-REQUIRED` header only.
+          headers:
+            PAYMENT-REQUIRED:
+              description: Base64-encoded x402 v2 payment challenge.
+              required: true
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { type: object }
+        "409":
+          description: The same payment is already being processed. Retry the identical request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: Per-payer or per-source-IP rate limit exceeded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: |
+            Terminal paid failure. Payment settled and supplier execution failed.
+            The signed receipt is evidence the attempt happened — preserve it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TerminalFailure" }
+        "503":
+          description: Payment, supplier, persistence, or signing is unavailable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "504":
+          description: Terminal paid failure — supplier execution timed out.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TerminalFailure" }
+
+  /api/fetch/{requestId}:
+    get:
+      tags: [fetch]
+      operationId: getFetchRequest
+      summary: Recover a terminal result or inspect processing state
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, pattern: "^gf_[0-9a-f]{32}$" }
+      responses:
+        "200":
+          description: |
+            A stored terminal outcome. Note that a FAILED request is also
+            returned with HTTP 200 and `status: "failed"` — the failure detail
+            lives in the signed receipt, not in an error envelope.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/StatusSucceeded"
+                  - $ref: "#/components/schemas/StatusFailed"
+        "202":
+          description: Still settling or executing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatusPending" }
+        "404":
+          description: No such request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: |
+            Execution may have completed but its result was not persisted. The
+            server will not re-run the retrieval, because that could duplicate an
+            external effect after payment. Reconcile against the recorded
+            settlement transaction.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatusUnresolved" }
+
+components:
+  schemas:
+    Country:
+      type: string
+      enum: [US, DE, JP, BR, IN]
+
+    Mode:
+      type: string
+      enum: [http, browser]
+      default: http
+
+    FetchRequest:
+      type: object
+      additionalProperties: false
+      required: [url, country]
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+          pattern: "^https://"
+          description: Public HTTPS URL. Private, loopback, and link-local targets are rejected.
+        country: { $ref: "#/components/schemas/Country" }
+        mode: { $ref: "#/components/schemas/Mode" }
+
+    FetchData:
+      type: object
+      required: [url, contentType, body]
+      properties:
+        url:
+          type: string
+          description: The originally requested URL, not the post-redirect URL.
+        contentType: { type: [string, "null"] }
+        body: { type: string }
+
+    AttestationKey:
+      type: object
+      required: [algorithm, keyId, publicKeyPem]
+      properties:
+        algorithm: { type: string, enum: [Ed25519] }
+        keyId: { type: string, pattern: "^[0-9a-f]{16}$" }
+        publicKeyPem: { type: string }
+
+    AttestationPayload:
+      type: object
+      description: The canonical source of attested values. Prefer these over the receipt's top-level duplicates.
+      required:
+        [version, requestId, paymentId, targetUrl, finalUrl, country, mode,
+         supplier, status, statusCode, bytesTransferred, contentSha256, completedAt]
+      properties:
+        version: { type: string, enum: ["1"] }
+        requestId: { type: string }
+        paymentId: { type: string }
+        targetUrl: { type: string }
+        finalUrl: { type: [string, "null"] }
+        country: { $ref: "#/components/schemas/Country" }
+        mode: { $ref: "#/components/schemas/Mode" }
+        supplier:
+          type: string
+          description: Identifier of the regional supplier that served the retrieval.
+        status: { type: string, enum: [succeeded, failed] }
+        statusCode: { type: [integer, "null"] }
+        bytesTransferred: { type: integer }
+        contentSha256:
+          type: [string, "null"]
+          pattern: "^[0-9a-f]{64}$"
+          description: Lowercase hex SHA-256 over the UTF-8 bytes of the body.
+        completedAt: { type: string, format: date-time }
+
+    Attestation:
+      type: object
+      required: [algorithm, keyId, publicKeyPem, payload, payloadCanonical, signature]
+      properties:
+        algorithm: { type: string, enum: [Ed25519] }
+        keyId: { type: string }
+        publicKeyPem: { type: string }
+        payload: { $ref: "#/components/schemas/AttestationPayload" }
+        payloadCanonical:
+          type: string
+          description: |
+            The exact JSON string whose UTF-8 bytes were signed. Verify against
+            THIS value. Re-serializing `payload` can produce different bytes.
+        signature:
+          type: string
+          description: Base64url-encoded Ed25519 signature.
+
+    Receipt:
+      type: object
+      required:
+        [requestId, supplier, country, mode, status, statusCode, finalUrl,
+         bytesTransferred, contentSha256, completedAt, attestation]
+      properties:
+        requestId: { type: string, pattern: "^gf_[0-9a-f]{32}$" }
+        supplier: { type: string }
+        country: { $ref: "#/components/schemas/Country" }
+        mode: { $ref: "#/components/schemas/Mode" }
+        status: { type: string, enum: [succeeded, failed] }
+        statusCode: { type: [integer, "null"] }
+        finalUrl: { type: [string, "null"] }
+        bytesTransferred: { type: integer }
+        contentSha256: { type: [string, "null"] }
+        completedAt: { type: string, format: date-time }
+        attestation: { $ref: "#/components/schemas/Attestation" }
+        paymentId:
+          type: string
+          description: Present on replay/status responses; absent on the initial response.
+        targetUrl:
+          type: string
+          description: Present on replay/status responses; absent on the initial response.
+        version:
+          type: string
+          description: Present on replay/status responses; absent on the initial response.
+
+    FetchSuccess:
+      type: object
+      required: [data, receipt]
+      properties:
+        data: { $ref: "#/components/schemas/FetchData" }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+        replayed:
+          type: boolean
+          description: True when a settled payment was resubmitted and the stored result was returned.
+
+    TerminalFailure:
+      type: object
+      required: [error, receipt]
+      properties:
+        error: { $ref: "#/components/schemas/ErrorDetail" }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+        replayed: { type: boolean }
+
+    StatusSucceeded:
+      type: object
+      required: [status, data, receipt]
+      properties:
+        status: { type: string, enum: [succeeded] }
+        data: { $ref: "#/components/schemas/FetchData" }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+
+    StatusFailed:
+      type: object
+      required: [status, receipt]
+      properties:
+        status: { type: string, enum: [failed] }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+
+    StatusPending:
+      type: object
+      required: [requestId, status, message]
+      properties:
+        requestId: { type: string }
+        status: { type: string, enum: [settling, executing] }
+        message: { type: string }
+
+    StatusUnresolved:
+      type: object
+      required: [requestId, status, message]
+      properties:
+        requestId: { type: string }
+        status: { type: string, enum: [unresolved] }
+        message: { type: string }
+
+    ErrorDetail:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: |
+            Stable codes include invalid_request, payment_required,
+            payment_settlement_failed, payment_in_progress, rate_limited,
+            payment_unavailable, fetch_unavailable, persistence_unavailable,
+            attestation_unavailable, request_not_found, timeout.
+
+            Supplier-layer codes such as http_status_403, unsafe_target,
+            redirect_limit_exceeded and supplier_fetch_failed are diagnostic —
+            branch on the HTTP status and the presence of a receipt instead.
+        message: { type: string }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: "#/components/schemas/ErrorDetail" }

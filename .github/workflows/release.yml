@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Which package to publish
+        required: true
+        type: choice
+        options: [regionfetch, regionfetch-mcp, both]
+
+permissions:
+  contents: read
+  # Required for npm provenance attestations.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      # The SDK publishes first: regionfetch-mcp depends on it.
+      - name: Publish regionfetch
+        if: inputs.package != 'regionfetch-mcp'
+        run: npm publish --workspace regionfetch --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish regionfetch-mcp
+        if: inputs.package != 'regionfetch'
+        run: npm publish --workspace regionfetch-mcp --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

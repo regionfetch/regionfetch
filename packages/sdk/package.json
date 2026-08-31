@@ -1,0 +1,84 @@
+{
+  "name": "regionfetch",
+  "version": "0.1.0",
+  "description": "Client for Region Fetch \u2014 paid geo-targeted web retrieval with signed Ed25519 receipts.",
+  "keywords": [
+    "regionfetch",
+    "x402",
+    "geo",
+    "proxy",
+    "fetch",
+    "agent",
+    "attestation",
+    "receipt"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/regionfetch/regionfetch.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/regionfetch/regionfetch/tree/main/packages/sdk#readme",
+  "bugs": {
+    "url": "https://github.com/regionfetch/regionfetch/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./verify": {
+      "types": "./dist/verify.d.ts",
+      "import": "./dist/verify.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    },
+    "./x402": {
+      "types": "./dist/x402.d.ts",
+      "import": "./dist/x402.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf dist .tmp-test",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test \".tmp-test/test/**/*.test.js\"",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "peerDependencies": {
+    "@x402/core": "^2.24.0",
+    "@x402/evm": "^2.24.0",
+    "viem": "^2.48.0"
+  },
+  "peerDependenciesMeta": {
+    "@x402/core": {
+      "optional": true
+    },
+    "@x402/evm": {
+      "optional": true
+    },
+    "viem": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^20.19.0",
+    "@x402/core": "^2.24.0",
+    "@x402/evm": "^2.24.0",
+    "viem": "^2.48.0"
+  }
+}

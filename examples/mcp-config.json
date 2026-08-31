@@ -1,0 +1,19 @@
+{
+  "$comment": [
+    "Wallet mode. The server signs one fresh x402 authorization per tool call,",
+    "which is the only configuration that keeps working past the first request.",
+    "Keep the private key in your MCP host's env block, never in a tool argument.",
+    "REGION_FETCH_MAX_PAYMENT caps each individual payment; 'off' disables the cap."
+  ],
+  "mcpServers": {
+    "regionfetch": {
+      "command": "npx",
+      "args": ["-y", "regionfetch-mcp"],
+      "env": {
+        "REGION_FETCH_BASE_URL": "https://regionfetch.dev",
+        "REGION_FETCH_WALLET_PRIVATE_KEY": "0x...",
+        "REGION_FETCH_MAX_PAYMENT": "$0.10"
+      }
+    }
+  }
+}

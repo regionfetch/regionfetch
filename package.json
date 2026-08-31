@@ -1,0 +1,21 @@
+{
+  "name": "regionfetch-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Monorepo for the Region Fetch SDK and MCP server.",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace regionfetch && npm run build --workspace regionfetch-mcp",
+    "clean": "npm run clean --workspaces --if-present",
+    "test": "npm run test --workspace regionfetch && npm run test --workspace regionfetch-mcp",
+    "typecheck": "npm run typecheck --workspace regionfetch && npm run typecheck --workspace regionfetch-mcp && tsc -p examples/tsconfig.json",
+    "smoke": "node --test test/published-compatibility.test.mjs"
+  },
+  "license": "MIT"
+}
