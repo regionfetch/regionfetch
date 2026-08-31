@@ -55,7 +55,7 @@
     "clean": "rm -rf dist .tmp-test",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
-    "test": "tsc -p tsconfig.test.json && node --test \".tmp-test/test/**/*.test.js\"",
+    "test": "tsc -p tsconfig.test.json && node --test $(find .tmp-test/test -name \"*.test.js\")",
     "prepublishOnly": "npm run clean && npm run build"
   },
   "peerDependencies": {
