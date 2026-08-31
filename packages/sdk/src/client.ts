@@ -111,6 +111,25 @@ function combineSignals(signals: (AbortSignal | undefined)[]): AbortSignal | und
   return AbortSignal.any(present);
 }
 
+/**
+ * Read the payer address out of an authorization we created.
+ *
+ * Only the address is extracted, never the signature or the payload itself.
+ */
+function payerFromSignature(paymentSignature: string): string | undefined {
+  try {
+    const decoded: unknown = JSON.parse(
+      Buffer.from(paymentSignature, "base64").toString("utf8"),
+    );
+    if (!isRecord(decoded) || !isRecord(decoded.payload)) return undefined;
+    const authorization = decoded.payload.authorization;
+    if (!isRecord(authorization)) return undefined;
+    return typeof authorization.from === "string" ? authorization.from : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -363,6 +382,23 @@ export class RegionFetchClient {
         attempt,
       );
       if (response.status === 200) return response;
+
+      if (response.status === 402) {
+        // The deployment answers a rejected payment with a bare 402: empty body,
+        // no PAYMENT-REQUIRED header. Only the client knows a payment was sent,
+        // so only the client can tell these two cases apart.
+        const payer = payerFromSignature(paymentSignature);
+        throw this.toPaymentRequiredError(
+          response,
+          readPaymentRequired(response.headers),
+          "The deployment rejected the payment that was supplied. It returned no " +
+            "reason. The usual causes are an unfunded payer wallet, an amount or " +
+            "network that does not match the challenge, or an expired authorization." +
+            (payer === undefined
+              ? ""
+              : ` Check the USDC balance on Base for the payer wallet ${payer}.`),
+        );
+      }
 
       const retryDelay = this.retryDelayFor(response, attempt);
       if (retryDelay === undefined) throw this.toApiError(response);

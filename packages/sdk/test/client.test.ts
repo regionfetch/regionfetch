@@ -406,3 +406,45 @@ describe("diagnostics", () => {
     assert.equal(result.data.body, TEST_BODY);
   });
 });
+
+describe("rejected payment", () => {
+  it("distinguishes a rejected payment from an absent one", async () => {
+    // The deployment answers a rejected payment with a bare 402 — empty body,
+    // no challenge header — so it looks identical to "no payment supplied".
+    // Only the client knows it sent one.
+    const { client } = clientWith([{ status: 402, body: {} }]);
+    await assert.rejects(
+      () => client.fetchUrl(INPUT, { paymentSignature: "an-authorization" }),
+      (error: unknown) => {
+        assert.ok(error instanceof RegionFetchPaymentRequiredError);
+        assert.match(error.message, /rejected the payment/);
+        assert.doesNotMatch(error.message, /configure a paymentProvider/);
+        return true;
+      },
+    );
+  });
+
+  it("names the payer wallet so the caller knows what to fund", async () => {
+    const signature = Buffer.from(
+      JSON.stringify({ payload: { authorization: { from: "0xPayerWallet" } } }),
+      "utf8",
+    ).toString("base64");
+    const { client } = clientWith([{ status: 402, body: {} }]);
+    await assert.rejects(
+      () => client.fetchUrl(INPUT, { paymentSignature: signature }),
+      (error: unknown) =>
+        error instanceof RegionFetchPaymentRequiredError &&
+        error.message.includes("0xPayerWallet"),
+    );
+  });
+
+  it("still asks for a provider when no payment was supplied", async () => {
+    const { client } = clientWith([CHALLENGE_402]);
+    await assert.rejects(
+      () => client.fetchUrl(INPUT),
+      (error: unknown) =>
+        error instanceof RegionFetchPaymentRequiredError &&
+        /configure a paymentProvider/.test(error.message),
+    );
+  });
+});

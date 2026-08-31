@@ -96,6 +96,18 @@ an authorization the server then rejects.
 If you integrate with a different x402 client that binds a payment to the
 advertised `resource.url`, prefer the origin you actually dialled.
 
+### 6. A rejected payment is reported as a bare 402
+
+When a payment is supplied but not accepted, the deployment answers `402` with
+an empty body **and no `PAYMENT-REQUIRED` header at all** — so at the protocol
+level it is indistinguishable from a request that carried no payment, and it
+carries no reason for the rejection.
+
+*Client impact:* the client tracks whether it sent a payment and reports the two
+cases differently. A rejection names the payer wallet extracted from the
+authorization, so the caller knows which balance to check, rather than being
+told to configure a payment provider they already configured.
+
 ## Confirmed as documented
 
 - `GET /api/healthz` → `200 {"status":"ok"}`
