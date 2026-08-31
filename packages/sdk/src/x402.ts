@@ -85,6 +85,17 @@ export function normalizePrivateKey(
           "(Value withheld.)",
       };
     }
+    // 40 hex characters is an address, not a key. This is by far the most
+    // common mix-up, because a wallet's copy button yields the address.
+    if (body.length === 40) {
+      return {
+        error:
+          "privateKey looks like a wallet address (20 bytes), not a private key " +
+          "(32 bytes). A wallet's copy button gives you the address; the private " +
+          "key is exported separately, usually under Settings > Security. " +
+          "(Value withheld.)",
+      };
+    }
     return {
       error:
         `privateKey has ${body.length} hex characters; a 32-byte key needs 64. ` +

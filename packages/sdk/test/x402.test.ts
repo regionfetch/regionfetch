@@ -42,6 +42,14 @@ describe("normalizePrivateKey", () => {
     assert.match(empty.error, /empty/);
   });
 
+  it("recognizes an address pasted in place of a key", () => {
+    // The most common mix-up: a wallet's copy button yields the address.
+    const result = normalizePrivateKey("0x000000000000000000000000000000000000dEaD");
+    assert.ok("error" in result);
+    assert.match(result.error, /wallet address/);
+    assert.match(result.error, /Settings > Security/);
+  });
+
   it("rejects a seed phrase pasted in place of a key", () => {
     const result = normalizePrivateKey(
       "witch collapse practice feed shame open despair creek road again ice least",
