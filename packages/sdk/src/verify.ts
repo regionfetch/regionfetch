@@ -91,6 +91,9 @@ const MIRRORED_FIELDS = [
   "bytesTransferred",
   "contentSha256",
   "completedAt",
+  "maxTier",
+  "resolvedTier",
+  "quotedAmount",
 ] as const satisfies readonly (keyof RegionFetchReceipt & keyof RegionFetchAttestationPayload)[];
 
 /**

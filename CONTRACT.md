@@ -131,23 +131,28 @@ actually settled.
 receive. Resending the authorization is harmless — it cannot charge twice — but
 it will not return the result.
 
-### 8. `max_tier` is not deployed yet
+### 8. Escalation tiers
 
-The SDK and MCP tool accept `max_tier` (`L0` | `L1` | `L2`) per the service
-handoff, but as of 2026-09-01 the deployment does not implement it:
+Verified deployed on 2026-09-01:
 
-- the Bazaar schema published in the challenge declares the request body
-  `additionalProperties: false` with only `url`, `country`, and `mode`;
-- every tier, `L3` included, returns the same `amount: 20000` ($0.02), so the
-  dearer L2 requirement is not yet reflected in the challenge;
-- `supplier` is declared `"const": "decodo"`, so the L2 unblocker is not live;
-- `L3` is not rejected before payment, contrary to the handoff.
+| Request | Challenge amount |
+| --- | --- |
+| no `max_tier` | `20000` ($0.02) |
+| `L0` / `L1` | `20000` ($0.02) |
+| `L2` | `50000` ($0.05) |
+| `L3` | rejected — `503 tier_unavailable`, before payment |
 
-*Client impact:* sending `max_tier` today is accepted by the server's payment
-gate — which ignores the body entirely — and may be rejected by body validation
-afterwards. The client never substitutes a price of its own: it authorizes
-exactly the amount in the challenge, so when tier pricing does ship, no client
-change is needed. `L3` is rejected locally, before payment.
+The published Bazaar schema declares `max_tier` with enum `["L0","L1","L2"]`,
+`supplier` as `["decodo","iproyal"]`, and adds `maxTier`, `resolvedTier` and
+`quotedAmount` to the receipt.
+
+*Client impact:* none required. The client authorizes exactly the amount in the
+challenge, so the dearer L2 requirement is honoured without a client change.
+`L3` is rejected locally before any request, which is a better outcome than the
+server's `503`.
+
+Note the tier price is set by the **challenge**, not by the request body: a
+client that hardcoded $0.02 would under-authorize an L2 request and be refused.
 
 ## Confirmed as documented
 

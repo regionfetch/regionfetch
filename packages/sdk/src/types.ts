@@ -70,8 +70,12 @@ export interface RegionFetchAttestationPayload {
   bytesTransferred: number;
   contentSha256: string | null;
   completedAt: string;
-  /** The tier that actually served the request, when the deployment attests one. */
+  /** The tier that was requested. */
+  maxTier?: RegionFetchMaxTier;
+  /** The tier that actually served the request; may be lower than `maxTier`. */
   resolvedTier?: RegionFetchMaxTier;
+  /** The amount quoted for this request, as a decimal string such as `"0.02"`. */
+  quotedAmount?: string;
 }
 
 export interface RegionFetchAttestation {
@@ -109,6 +113,12 @@ export interface RegionFetchReceipt {
   contentSha256: string | null;
   completedAt: string;
   attestation: RegionFetchAttestation;
+  /** The tier that was requested. */
+  maxTier?: RegionFetchMaxTier;
+  /** The tier that actually served the request; may be lower than `maxTier`. */
+  resolvedTier?: RegionFetchMaxTier;
+  /** The amount quoted for this request, as a decimal string such as `"0.02"`. */
+  quotedAmount?: string;
   paymentId?: string;
   targetUrl?: string;
   version?: string;

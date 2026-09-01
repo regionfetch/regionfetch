@@ -66,8 +66,8 @@ deployment returns in its challenge, so a dearer tier needs no client change.
 `L3` is not a supported capability and is rejected before any payment is
 created.
 
-Tier support is not live on the hosted deployment yet; see
-[CONTRACT.md](CONTRACT.md) item 8.
+L2 is priced higher than L0/L1 — $0.05 against $0.02 at the time of writing —
+and the price comes from the challenge, never from the client.
 
 ### Pricing
 
