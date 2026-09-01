@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.regionfetch/regionfetch-mcp",
+  "name": "dev.regionfetch/mcp",
   "title": "Region Fetch",
   "description": "Fetch any public URL as a visitor in a chosen country, with a signed receipt of its origin.",
   "version": "0.1.1",
