@@ -1,7 +1,8 @@
 {
   "name": "regionfetch-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Region Fetch \u2014 paid geo-targeted web retrieval with signed Ed25519 receipts.",
+  "mcpName": "io.github.regionfetch/regionfetch-mcp",
   "keywords": [
     "mcp",
     "modelcontextprotocol",

@@ -1,0 +1,29 @@
+name: Publish to MCP Registry
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # GitHub OIDC, so no registry token needs to be stored.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mcp-publisher
+        run: |
+          curl -sSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/').tar.gz" \
+            | tar xz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
+
+      # The registry cross-checks server.json against the `mcpName` field in the
+      # published npm package, so regionfetch-mcp must be on npm at this version
+      # before this runs.
+      - name: Publish
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish
