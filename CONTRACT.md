@@ -108,6 +108,22 @@ cases differently. A rejection names the payer wallet extracted from the
 authorization, so the caller knows which balance to check, rather than being
 told to configure a payment provider they already configured.
 
+### 7. A settled payment is refused, not replayed
+
+Documented behaviour is that resubmitting a settled payment returns the stored
+result with `replayed: true`. Verified against production: it returns `402`.
+
+The cause looks structural rather than incidental. x402 `exact` uses EIP-3009
+`transferWithAuthorization`, whose nonce is consumed on-chain at settlement, and
+the facilitator verify runs *before* the durable-record replay check. Verify
+fails on the spent nonce, so the replay path is unreachable for any payment that
+actually settled.
+
+*Client impact:* recovery after an ambiguous failure must use
+`GET /api/fetch/{requestId}`. Capture `requestId` from every response you
+receive. Resending the authorization is harmless — it cannot charge twice — but
+it will not return the result.
+
 ## Confirmed as documented
 
 - `GET /api/healthz` → `200 {"status":"ok"}`

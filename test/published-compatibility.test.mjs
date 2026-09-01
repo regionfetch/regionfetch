@@ -141,16 +141,27 @@ describe("live deployment — paid checks", { skip: spendSkip }, () => {
     assert.equal(result.receipt.attestation.payload.mode, "http");
   });
 
-  it("replays the same payment to the same stored result", async () => {
-    const replay = await client.fetchUrl(
-      { url: "https://example.com/", country: "US", mode: "http" },
-      { paymentSignature: capturedSignature },
-    );
-    assert.equal(replay.receipt.requestId, result.receipt.requestId);
-    assert.equal(
-      replay.receipt.attestation.signature,
-      result.receipt.attestation.signature,
-      "a replay must return the original receipt, not a re-signed one",
+  it("refuses a settled payment rather than replaying it", async () => {
+    // The documented behaviour (handoff section 11) is that resubmitting a
+    // settled payment returns the stored result with `replayed: true`. It does
+    // not, and structurally cannot: x402 exact uses EIP-3009, whose nonce is
+    // consumed on-chain at settlement, and the facilitator verify runs before
+    // the durable-record replay check. Verify fails on the spent nonce and the
+    // request never reaches the replay path.
+    //
+    // This asserts what the deployment actually does, so the divergence stays
+    // visible. If the server is reordered to check its record first, this test
+    // fails and should be rewritten to assert the replay.
+    await assert.rejects(
+      () =>
+        client.fetchUrl(
+          { url: "https://example.com/", country: "US", mode: "http" },
+          { paymentSignature: capturedSignature },
+        ),
+      (error) => {
+        assert.equal(error.status, 402, "a spent authorization is refused, not replayed");
+        return true;
+      },
     );
   });
 

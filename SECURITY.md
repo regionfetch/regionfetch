@@ -41,8 +41,10 @@ enforces the safe direction of this:
 - A single logical `fetchUrl` call will never create a second payment, even if
   the paid attempt is refused again.
 
-After an ambiguous connection failure, resend the identical request or call
-`getRequest(requestId)`. Creating a fresh payment risks paying twice.
+After an ambiguous connection failure, call `getRequest(requestId)`. Resending
+the identical authorization is safe but will not recover the result: the EIP-3009
+nonce is spent at settlement, so the deployment refuses it with `402`. Creating a
+*fresh* payment is the thing that risks paying twice — never do that.
 
 ### Verify before you trust
 

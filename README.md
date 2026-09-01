@@ -204,8 +204,13 @@ respected. Configure with `retry: { maxRetries, baseDelayMs, maxDelayMs }`.
 ### After an ambiguous failure
 
 If the connection drops after you sent a payment, **do not create a second
-payment**. Either resend the identical body with the identical authorization, or
-look the request up:
+payment** — but be aware that resending the identical authorization will not
+recover the result either. x402 `exact` uses EIP-3009, whose nonce is spent
+on-chain at settlement, so a settled payment is refused with `402` rather than
+replayed. Resending is harmless (it cannot charge twice), it just will not work.
+
+The reliable recovery is the status endpoint, so **capture `requestId` from
+every response you do receive**:
 
 ```ts
 const state = await client.getRequest(requestId);
