@@ -8,7 +8,14 @@ documentation, and what the client works around. Verified against
 
 These were confirmed by probing production, not read from a document.
 
-### 1. The 402 body is empty
+### 1. The 402 body is empty — FIXED UPSTREAM
+
+*Resolved 2026-09-01: the body now carries a proper `{"error":{"code":"payment_required"}}`
+envelope, and the challenge additionally includes Bazaar discovery metadata,
+`serviceName`, and `tags`. The client still reads requirements from the header
+only, which is correct either way. Original observation follows.*
+
+### 1a. Original: the 402 body was empty
 
 The handoff describes `402` as returning
 `{"error":{"code":"payment_required", ...}}`. It returns `{}`.
@@ -123,6 +130,24 @@ actually settled.
 `GET /api/fetch/{requestId}`. Capture `requestId` from every response you
 receive. Resending the authorization is harmless — it cannot charge twice — but
 it will not return the result.
+
+### 8. `max_tier` is not deployed yet
+
+The SDK and MCP tool accept `max_tier` (`L0` | `L1` | `L2`) per the service
+handoff, but as of 2026-09-01 the deployment does not implement it:
+
+- the Bazaar schema published in the challenge declares the request body
+  `additionalProperties: false` with only `url`, `country`, and `mode`;
+- every tier, `L3` included, returns the same `amount: 20000` ($0.02), so the
+  dearer L2 requirement is not yet reflected in the challenge;
+- `supplier` is declared `"const": "decodo"`, so the L2 unblocker is not live;
+- `L3` is not rejected before payment, contrary to the handoff.
+
+*Client impact:* sending `max_tier` today is accepted by the server's payment
+gate — which ignores the body entirely — and may be rejected by body validation
+afterwards. The client never substitutes a price of its own: it authorizes
+exactly the amount in the challenge, so when tier pricing does ship, no client
+change is needed. `L3` is rejected locally, before payment.
 
 ## Confirmed as documented
 

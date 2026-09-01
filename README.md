@@ -55,6 +55,20 @@ payment is created.
 | `http` (default) | Direct proxied GET with a country-appropriate locale, user agent, and `Accept-Language`. Follows up to five redirects, revalidating each target. |
 | `browser` | Headless Chromium through the regional proxy, with a country-appropriate locale, timezone, viewport, and user agent. Waits for `domcontentloaded` and returns rendered HTML. |
 
+### Escalation tiers
+
+`max_tier` caps how hard the service will work to retrieve a blocked page:
+`L0` and `L1` use the standard regional supplier, `L2` permits escalation to a
+managed unblocker and costs more. Defaults to `L1`.
+
+The client never assumes a price — it authorizes exactly the amount the
+deployment returns in its challenge, so a dearer tier needs no client change.
+`L3` is not a supported capability and is rejected before any payment is
+created.
+
+Tier support is not live on the hosted deployment yet; see
+[CONTRACT.md](CONTRACT.md) item 8.
+
 ### Pricing
 
 The default list price is **$0.02 USDC per request** on **Base**

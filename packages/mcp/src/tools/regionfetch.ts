@@ -45,6 +45,16 @@ export const toolInputSchema = {
     .describe(
       "http for a lightweight request; browser to render JavaScript. Defaults to http.",
     ),
+  // L3 is deliberately absent: it is not a supported capability, and an enum is
+  // the only thing that reliably stops a model from guessing it.
+  max_tier: z
+    .enum(["L0", "L1", "L2"])
+    .optional()
+    .describe(
+      "Highest escalation tier to pay for. L0 and L1 use the standard regional " +
+        "supplier. L2 permits escalation to a managed unblocker for hard targets " +
+        "and costs more. Defaults to L1.",
+    ),
 };
 
 export const toolOutputSchema = {

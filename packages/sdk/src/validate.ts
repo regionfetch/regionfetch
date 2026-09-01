@@ -1,17 +1,19 @@
 import { RegionFetchConfigError, RegionFetchValidationError } from "./errors.js";
 import {
   REGION_FETCH_COUNTRIES,
+  REGION_FETCH_MAX_TIERS,
   REGION_FETCH_MAX_URL_LENGTH,
   REGION_FETCH_MODES,
   type RegionFetchCountry,
   type RegionFetchInput,
+  type RegionFetchMaxTier,
   type RegionFetchMode,
 } from "./types.js";
 
 /** The canonical production origin. */
 export const DEFAULT_BASE_URL = "https://regionfetch.dev";
 
-const ALLOWED_INPUT_KEYS = new Set(["url", "country", "mode"]);
+const ALLOWED_INPUT_KEYS = new Set(["url", "country", "mode", "max_tier"]);
 
 /**
  * Normalize a base URL to a bare origin.
@@ -91,6 +93,7 @@ export function validateInput(input: RegionFetchInput): {
   url: string;
   country: RegionFetchCountry;
   mode?: RegionFetchMode;
+  max_tier?: RegionFetchMaxTier;
 } {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new RegionFetchValidationError("Fetch input must be an object.");
@@ -105,7 +108,7 @@ export function validateInput(input: RegionFetchInput): {
     }
   }
 
-  const { url, country, mode } = input;
+  const { url, country, mode, max_tier: maxTier } = input;
 
   if (typeof url !== "string" || url.length === 0) {
     throw new RegionFetchValidationError("url must be a non-empty string.", "url");
@@ -150,9 +153,25 @@ export function validateInput(input: RegionFetchInput): {
     );
   }
 
-  return mode === undefined
-    ? { url, country: country as RegionFetchCountry }
-    : { url, country: country as RegionFetchCountry, mode: mode as RegionFetchMode };
+  if (maxTier !== undefined && !REGION_FETCH_MAX_TIERS.includes(maxTier as RegionFetchMaxTier)) {
+    // L3 is called out by name because it exists in internal planning and is a
+    // plausible guess, but it is not a supported capability.
+    const hint =
+      String(maxTier).toUpperCase() === "L3"
+        ? " L3 is not a supported capability and must not be requested."
+        : "";
+    throw new RegionFetchValidationError(
+      `max_tier must be one of ${REGION_FETCH_MAX_TIERS.join(", ")} (got ${JSON.stringify(maxTier)}).${hint}`,
+      "max_tier",
+    );
+  }
+
+  return {
+    url,
+    country: country as RegionFetchCountry,
+    ...(mode === undefined ? {} : { mode: mode as RegionFetchMode }),
+    ...(maxTier === undefined ? {} : { max_tier: maxTier as RegionFetchMaxTier }),
+  };
 }
 
 /** Request IDs are `gf_` followed by 32 lowercase hex characters. */

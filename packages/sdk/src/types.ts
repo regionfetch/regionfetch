@@ -14,6 +14,17 @@ export type RegionFetchCountry = (typeof REGION_FETCH_COUNTRIES)[number];
 export const REGION_FETCH_MODES = ["http", "browser"] as const;
 export type RegionFetchMode = (typeof REGION_FETCH_MODES)[number];
 
+/**
+ * Escalation tiers. `L0`/`L1` use the standard regional supplier; `L2` permits
+ * escalation to a managed unblocker after lower-tier blocking signals, and is
+ * priced higher.
+ *
+ * `L3` exists in internal planning but is deliberately NOT part of this union.
+ * It is not a supported capability and must never be advertised or sent.
+ */
+export const REGION_FETCH_MAX_TIERS = ["L0", "L1", "L2"] as const;
+export type RegionFetchMaxTier = (typeof REGION_FETCH_MAX_TIERS)[number];
+
 /** Maximum accepted target URL length, enforced by the server. */
 export const REGION_FETCH_MAX_URL_LENGTH = 2048;
 
@@ -24,6 +35,15 @@ export interface RegionFetchInput {
   country: RegionFetchCountry;
   /** Defaults to `"http"` server-side. */
   mode?: RegionFetchMode;
+  /**
+   * Highest escalation tier the caller will pay for. Defaults to `"L1"`
+   * server-side.
+   *
+   * `L2` costs more than `L0`/`L1`. Never assume a price: the client authorizes
+   * exactly the amount the deployment returns in its challenge, so a tier with
+   * a higher price is handled without a client change.
+   */
+  max_tier?: RegionFetchMaxTier;
 }
 
 export interface RegionFetchData {
@@ -50,6 +70,8 @@ export interface RegionFetchAttestationPayload {
   bytesTransferred: number;
   contentSha256: string | null;
   completedAt: string;
+  /** The tier that actually served the request, when the deployment attests one. */
+  resolvedTier?: RegionFetchMaxTier;
 }
 
 export interface RegionFetchAttestation {

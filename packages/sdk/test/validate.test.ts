@@ -122,3 +122,42 @@ describe("validateRequestId", () => {
     }
   });
 });
+
+describe("validateInput max_tier", () => {
+  const valid = { url: "https://example.com/", country: "US" as const };
+
+  it("accepts every supported tier", () => {
+    for (const max_tier of ["L0", "L1", "L2"] as const) {
+      assert.deepEqual(validateInput({ ...valid, max_tier }), {
+        url: valid.url,
+        country: "US",
+        max_tier,
+      });
+    }
+  });
+
+  it("omits max_tier when not supplied rather than defaulting locally", () => {
+    assert.deepEqual(validateInput(valid), { url: valid.url, country: "US" });
+  });
+
+  it("rejects L3 by name, because it is a plausible guess and unsupported", () => {
+    assert.throws(
+      () => validateInput({ ...valid, max_tier: "L3" as never }),
+      (error: unknown) => {
+        assert.ok(error instanceof RegionFetchValidationError);
+        assert.equal(error.field, "max_tier");
+        assert.match(error.message, /L3 is not a supported capability/);
+        return true;
+      },
+    );
+  });
+
+  it("rejects other nonsense tiers", () => {
+    for (const bad of ["l1", "L4", "high", ""]) {
+      assert.throws(
+        () => validateInput({ ...valid, max_tier: bad as never }),
+        RegionFetchValidationError,
+      );
+    }
+  });
+});

@@ -448,3 +448,40 @@ describe("rejected payment", () => {
     );
   });
 });
+
+describe("max_tier", () => {
+  it("forwards max_tier in the request body", async () => {
+    const { client, mock } = clientWith([{ status: 200, body: SUCCESS_BODY }]);
+    await client.fetchUrl({ ...INPUT, max_tier: "L2" }, { paymentSignature: "abc" });
+    assert.deepEqual(JSON.parse(mock.calls[0]!.body!), {
+      url: INPUT.url,
+      country: "US",
+      max_tier: "L2",
+    });
+  });
+
+  it("authorizes whatever the challenge asks, not a hardcoded price", async () => {
+    // The L2 price differs from L0/L1. The client must never substitute an
+    // amount of its own, so a dearer challenge needs no client change.
+    const dearChallenge = {
+      ...SAMPLE_CHALLENGE,
+      accepts: [{ ...SAMPLE_CHALLENGE.accepts[0], amount: "50000" }],
+    };
+    let seen: string | undefined;
+    const provider = {
+      async createPayment(context: { paymentRequired?: { accepts: { amount?: string }[] } }) {
+        seen = context.paymentRequired?.accepts[0]?.amount;
+        return "sig";
+      },
+    };
+    const { client } = clientWith(
+      [
+        { status: 402, body: {}, headers: { "payment-required": paymentRequiredHeader(dearChallenge) } },
+        { status: 200, body: SUCCESS_BODY },
+      ],
+      provider,
+    );
+    await client.fetchUrl({ ...INPUT, max_tier: "L2" });
+    assert.equal(seen, "50000", "the provider must see the amount the server asked for");
+  });
+});
